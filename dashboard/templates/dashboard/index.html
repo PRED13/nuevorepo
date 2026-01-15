@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Proyecto</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #e9ecef; font-family: 'Inter', sans-serif; color: #343a40; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .navbar { background-color: #212529; padding: 1rem; }
+        .card { border: none; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 25px; }
+        .card-header-custom { background-color: #0d6efd; color: white; border-radius: 10px 10px 0 0; padding: 12px 20px; font-weight: 600; }
+        .bg-dark-section { background-color: #212529; color: white; }
+        .table { font-size: 0.85rem; vertical-align: middle; }
+        .snippet-box { background-color: #0f172a; color: #38bdf8; border-radius: 6px; padding: 15px; font-size: 0.8rem; height: 180px; overflow-y: auto; text-align: left; }
+        .label-title { font-size: 0.75rem; font-weight: 700; color: #6c757d; text-transform: uppercase; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container">
+            <span class="navbar-brand h1 mb-0 mono text-light">Proyecto</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card p-4 mb-4">
+            <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-5">
+                    <label class="label-title">Seleccionar archivo (.ARFF)</label>
+                    <input type="file" name="arff_file" class="form-control">
+                </div>
+                <div class="col-md-5">
+                    <label class="label-title">Seleccionar Emails (INMAIL.*)</label>
+                    <input type="file" name="raw_file" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-dark w-100 fw-bold">procesar</button>
+                </div>
+            </form>
+        </div>
+
+        {% if nsl_table %}
+        <div class="row">
+            <div class="col-lg-4">
+                <div class="card p-3 h-100">
+                    <div class="label-title">Distribución de Protocolos</div>
+                    <canvas id="protocolChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="card-header bg-white fw-bold py-3 border-bottom">Tipos de red</div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mono">
+                            <thead class="table-light">
+                                <tr><th>Protocolo</th><th>Servicio</th><th>Flag</th><th>Estado</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for row in nsl_table %}
+                                <tr>
+                                    <td>{{ row.protocol_type }}</td>
+                                    <td>{{ row.service }}</td>
+                                    <td>{{ row.flag }}</td>
+                                    <td class="{% if row.class == 'normal' %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                        {{ row.class }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if spam_result %}
+        <div class="card mt-4">
+            <div class="card-header-custom">Emails</div>
+            <div class="card-body p-5">
+                <div class="row align-items-center">
+                    <div class="col-md-3 text-center">
+                        <div class="label-title">que tipo es ham o spam?</div>
+                        <h1 class="display-3 fw-bold {% if spam_result == 'SPAM' %}text-danger{% else %}text-success{% endif %}">
+                            {{ spam_result }}
+                        </h1>
+                        <span class="badge bg-light text-dark border mono px-3">{{ file_name }}</span>
+                    </div>
+
+                    <div class="col-md-4 text-center">
+                        <div class="label-title">Confianza del correo</div>
+                        <div style="max-width: 220px; margin: 0 auto;">
+                            <canvas id="spamProbChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <div class="label-title">Contenido Analizado del correo</div>
+                        <div class="snippet-box mono">
+                            {{ raw_snippet }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not nsl_table and not spam_result %}
+        <div class="text-center py-5">
+            <p class="text-muted mono mt-5">Esperando archivos para procesar el diagnóstico...</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        {% if chart_values %}
+        new Chart(document.getElementById('protocolChart'), {
+            type: 'doughnut',
+            data: {
+                labels: {{ chart_labels|safe }},
+                datasets: [{
+                    data: {{ chart_values|safe }},
+                    backgroundColor: ['#0d6efd', '#6610f2', '#ffc107', '#dc3545']
+                }]
+            },
+            options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+        });
+        {% endif %}
+
+        {% if spam_prob_values %}
+        new Chart(document.getElementById('spamProbChart'), {
+            type: 'pie',
+            data: {
+                labels: ['HAM %', 'SPAM %'],
+                datasets: [{
+                    data: {{ spam_prob_values|safe }},
+                    backgroundColor: ['#198754', '#dc3545']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
